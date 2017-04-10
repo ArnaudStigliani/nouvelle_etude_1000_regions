@@ -1,0 +1,268 @@
+rm(list=ls())
+library(Biostrings)
+nRegion <- 600
+library(stringr)
+source("PNfonctions.r")                 # fonctions auxiliaires
+
+
+
+#-------------------------------------read matrices ------------------------------------------
+
+
+pfm_ARF2<- read.table("m_ARF2.txt",header=TRUE,sep="\t",skip=1)
+pfm_ARF2 <- round((t(as.matrix(pfm_ARF2)))*nRegion)+1 ;pfm_ARF2
+maxi_ARF2 <- apply(pfm_ARF2,FUN=max, 2)
+maxi_ARF2 <- matrix(nrow=4, rep(maxi_ARF2,4),byrow=TRUE)
+pwm_ARF2 <- log(pfm_ARF2/maxi_ARF2)
+pwm_ARF2_rev <- pwm_ARF2 - minScore(pwm_ARF2)/dim(pwm_ARF2)[2] 
+
+pwm_ARF2 <-  reverseComplement(pwm_ARF2_rev) ; pwm_ARF2
+
+#-------------------------------------read fasta files-----------------------------------------
+
+
+ARF2_pos <- readDNAStringSet('ARF2.fas')#[(1:1000)]
+ARF2_neg <- readDNAStringSet('ARF2_neg_wo_ARF5.fas')#[(1:1000)]
+width_pos <- width(ARF2_pos)
+width_neg <- width(ARF2_neg)
+
+seq_pos <- as.character(ARF2_pos)
+seq_neg <- as.character(ARF2_neg)
+
+
+#-------------------------------------Compute Scores-----------------------------------------
+
+th <- maxScore(pwm_ARF2) - 9
+
+#pos
+
+scores_ARF2_pos<- mapply(seq_pos,FUN=PWMscoreStartingAt,SIMPLIFY=FALSE,  starting.at=mapply(seq,1,width_pos-dim(pwm_ARF2)[2],SIMPLIFY=FALSE),MoreArgs=list(pwm=pwm_ARF2))
+
+scores_ARF2_rev_pos <- mapply(seq_pos,FUN=PWMscoreStartingAt,SIMPLIFY=FALSE,  starting.at=mapply(seq,1,width_pos-dim(pwm_ARF2_rev)[2],SIMPLIFY=FALSE),MoreArgs=list(pwm=pwm_ARF2_rev))
+
+density_pos <- (sapply(FUN=sum,lapply(FUN=">",scores_ARF2_pos,th))+sapply(FUN=sum,lapply(FUN=">",scores_ARF2_rev_pos,th)))/(width_pos*2)
+
+#neg
+
+scores_ARF2_neg <- mapply(seq_neg,FUN=PWMscoreStartingAt,SIMPLIFY=FALSE,  starting.at=mapply(seq,1,width_neg-dim(pwm_ARF2)[2],SIMPLIFY=FALSE),MoreArgs=list(pwm=pwm_ARF2))
+
+scores_ARF2_rev_neg <- mapply(seq_neg,FUN=PWMscoreStartingAt,SIMPLIFY=FALSE,  starting.at=mapply(seq,1,width_neg-dim(pwm_ARF2_rev)[2],SIMPLIFY=FALSE),MoreArgs=list(pwm=pwm_ARF2_rev))
+
+density_neg <- (sapply(FUN=sum,lapply(FUN=">",scores_ARF2_neg,th))+sapply(FUN=sum,lapply(FUN=">",scores_ARF2_rev_neg,th)))/(width_neg*2)
+
+#-----------------------------------Compute GC content --------- -----------------------------
+
+#pos
+
+## seq_rev_pos <- as.character(reverseComplement(ARF2_pos))
+## strand <- sapply(FUN=max,scores_ARF2_pos) > sapply(FUN=max,scores_ARF2_rev_pos)
+## seq_pos_tot <- ifelse(strand,seq_pos,seq_rev_pos)
+## scores_pos_tot <- mapply(seq_pos_tot,FUN=PWMscoreStartingAt,SIMPLIFY=FALSE, starting.at=mapply(seq,1,width_pos-dim(pwm_ARF2)[2],SIMPLIFY=FALSE),MoreArgs=list(pwm=pwm_ARF2))
+
+
+## scores_pos_tot2 <- matrix(unlist(scores_pos_tot), byrow=TRUE,ncol=length(scores_pos_tot[[1]]))[,44:144]
+## pos_max <- apply(FUN=which.max,scores_pos_tot2,1)
+## pos_max <- pos_max + 44
+## seq_pos_narrow <- narrow(seq_pos_tot,start=pos_max-44,width=100)
+## GC_frequency_pos<- t(sapply(FUN=letterFrequencyInSlidingView,DNAStringSet(seq_pos_narrow),letters='GC',view.width=1))
+## GC_frequency_pos_mean <- apply(FUN=mean,GC_frequency_pos,MARGIN=2)
+
+## #neg
+
+## seq_rev_neg <- as.character(reverseComplement(ARF2_neg))
+## strand <- sapply(FUN=max,scores_ARF2_neg) > sapply(FUN=max,scores_ARF2_rev_neg)
+## seq_neg_tot <- ifelse(strand,seq_neg,seq_rev_neg)
+## scores_neg_tot <- mapply(seq_neg_tot,FUN=PWMscoreStartingAt,SIMPLIFY=FALSE, starting.at=mapply(seq,1,width_neg-dim(pwm_ARF2)[2],SIMPLIFY=FALSE),MoreArgs=list(pwm=pwm_ARF2))
+
+
+## scores_neg_tot2 <- matrix(unlist(scores_neg_tot), byrow=TRUE,ncol=length(scores_neg_tot[[1]]))[,44:144]
+## neg_max <- apply(FUN=which.max,scores_neg_tot2,1)
+## neg_max <- neg_max + 44
+## seq_neg_narrow <- narrow(seq_neg_tot,start=neg_max-44,width=100)
+## GC_frequency_neg<- t(sapply(FUN=letterFrequencyInSlidingView,DNAStringSet(seq_neg_narrow),letters='GC',view.width=1))
+## GC_frequency_neg_mean <- apply(FUN=mean,GC_frequency_neg,MARGIN=2)
+
+## corr_pos <- apply(FUN=cor,GC_frequency_pos[,1:44],y=GC_frequency_pos_mean[1:44],method="pearson",1)
+## corr_neg <- apply(FUN=cor,GC_frequency_neg[,1:44],y=GC_frequency_pos_mean[1:44],method="pearson",1)
+
+## GC_pos <- apply(FUN=mean,GC_frequency_pos,1)
+## GC_neg <- apply(FUN=mean,GC_frequency_neg,1)
+
+
+## plot(GC_frequency_pos_mean,type="l",col="cornflowerblue")#,ylim=c(0.25,0.4))
+## lines(GC_frequency_neg_mean,type="l",col="red")
+
+#mean(GC_frequency_neg)
+
+#-----------------------------------Compute Scores Interdistances-----------------------------
+#initialise
+
+scores_DR_pos<- matrix(0,nrow=length(ARF2_pos),ncol=21)
+scores_DR_pos_rev<- matrix(0,nrow=length(ARF2_pos),ncol=21)
+scores_ER_pos<- matrix(0,nrow=length(ARF2_pos),ncol=21)
+scores_IR_pos<- matrix(0,nrow=length(ARF2_pos),ncol=21)
+
+scores_DR_neg<- matrix(0,nrow=length(ARF2_neg),ncol=21)
+scores_DR_neg_rev<- matrix(0,nrow=length(ARF2_neg),ncol=21)
+scores_ER_neg<- matrix(0,nrow=length(ARF2_neg),ncol=21)
+scores_IR_neg<- matrix(0,nrow=length(ARF2_neg),ncol=21)
+
+
+# Compute DR 
+
+for(i in 1:length(ARF2_pos))
+{
+    for (j in 7:27)
+    {
+        scores_DR_pos[i,j-6] <- max(scores_ARF2_pos[[i]][j:(width_pos[i]-dim(pwm_ARF2)[2])] + scores_ARF2_pos[[i]][1:(width_pos[i]-j+1-dim(pwm_ARF2)[2])])
+    }
+}
+
+
+for(i in 1:length(ARF2_neg))
+{
+    for (j in 7:27)
+    {
+        scores_DR_neg[i,j-6] <- max(scores_ARF2_neg[[i]][j:(width_neg[i]-dim(pwm_ARF2)[2])] + scores_ARF2_neg[[i]][1:(width_neg[i]-j+1-dim(pwm_ARF2)[2])])
+    }
+}
+
+# Compute DR rev
+
+for(i in 1:length(ARF2_pos))
+{
+    for (j in 7:27)
+    {
+        scores_DR_pos_rev[i,j-6] <- max(scores_ARF2_rev_pos[[i]][j:(width_pos[i]-dim(pwm_ARF2_rev)[2])] + scores_ARF2_rev_pos[[i]][1:(width_pos[i]-j+1-dim(pwm_ARF2_rev)[2])])
+    }
+}
+
+
+for(i in 1:length(ARF2_neg))
+{
+    for (j in 7:27)
+    {
+        scores_DR_neg_rev[i,j-6] <- max(scores_ARF2_rev_neg[[i]][j:(width_neg[i]-dim(pwm_ARF2_rev)[2])] + scores_ARF2_rev_neg[[i]][1:(width_neg[i]-j+1-dim(pwm_ARF2_rev)[2])])
+    }
+}
+
+# Best score between DR and DR rev
+
+scores_DR_pos <- ifelse(scores_DR_pos > scores_DR_pos_rev, scores_DR_pos,scores_DR_pos_rev)
+scores_DR_neg <- ifelse(scores_DR_neg > scores_DR_neg_rev, scores_DR_neg,scores_DR_neg_rev)
+
+# Compute IR 
+
+for(i in 1:length(ARF2_pos))
+{
+    for (j in 7:27)
+    {
+        scores_IR_pos[i,j-6] <- max(scores_ARF2_pos[[i]][j:(width_pos[i]-dim(pwm_ARF2)[2])] + scores_ARF2_rev_pos[[i]][1:(width_pos[i]-j+1-dim(pwm_ARF2_rev)[2])])
+    }
+}
+
+
+for(i in 1:length(ARF2_neg))
+{
+    for (j in 7:27)
+    {
+        scores_IR_neg[i,j-6] <- max(scores_ARF2_neg[[i]][j:(width_neg[i]-dim(pwm_ARF2)[2])] + scores_ARF2_rev_neg[[i]][1:(width_neg[i]-j+1-dim(pwm_ARF2_rev)[2])])
+    }
+}
+
+# Compute ER
+
+for(i in 1:length(ARF2_pos))
+{
+    for (j in 7:27)
+    {
+        scores_ER_pos[i,j-6] <- max(scores_ARF2_rev_pos[[i]][j:(width_pos[i]-dim(pwm_ARF2_rev)[2])] + scores_ARF2_pos[[i]][1:(width_pos[i]-j+1-dim(pwm_ARF2)[2])])
+    }
+}
+
+
+for(i in 1:length(ARF2_neg))
+{
+    for (j in 7:27)
+    {
+        scores_ER_neg[i,j-6] <- max(scores_ARF2_rev_neg[[i]][j:(width_neg[i]-dim(pwm_ARF2_rev)[2])] + scores_ARF2_neg[[i]][1:(width_neg[i]-j+1-dim(pwm_ARF2)[2])])
+    }
+}
+
+
+
+#------------------------Meilleurs scores--------------------------------
+pos <- apply(FUN=max, cbind(scores_DR_pos,scores_IR_pos,scores_ER_pos),MARGIN=1)
+neg <- apply(FUN=max, cbind(scores_DR_neg,scores_IR_neg,scores_ER_neg),MARGIN=1)
+
+
+scores_ER_pos2 <- scores_ER_pos
+scores_ER_neg2 <- scores_ER_neg
+scores_IR_pos2 <- scores_IR_pos
+scores_IR_neg2 <- scores_IR_neg
+scores_DR_pos2 <- scores_DR_pos
+scores_DR_neg2 <- scores_DR_neg
+scores_ER_pos2[,8] <- scores_ER_pos2[,8] + 25
+scores_ER_neg2[,8] <- scores_ER_neg2[,8] + 25
+scores_ER_pos2[,9] <- scores_ER_pos2[,9] + 20
+scores_ER_neg2[,9] <- scores_ER_neg2[,9] + 20
+## scores_IR_pos2[,12] <- scores_IR_pos2[,12] +3
+## scores_IR_neg2[,12] <- scores_IR_neg2[,12] +3
+## scores_IR_pos2[,10] <- scores_IR_pos2[,10] +3
+## scores_IR_neg2[,10] <- scores_IR_neg2[,10] +3
+## scores_DR_pos2[,4] <- scores_DR_pos2[,4]  
+## scores_DR_neg2[,4] <- scores_DR_neg2[,4]
+pos_pen <- apply(FUN=max, cbind(scores_DR_pos2,scores_IR_pos2,scores_ER_pos2),MARGIN=1)
+neg_pen <- apply(FUN=max, cbind(scores_DR_neg2,scores_IR_neg2,scores_ER_neg2),MARGIN=1)
+pos_pen2 <- pos_pen - density_pos *650
+neg_pen2 <- neg_pen - density_neg *650
+## pos_pen3 <- pos_pen2 - GC_pos*50
+## neg_pen3 <- neg_pen2 - GC_neg*50
+rc1 = ROCcurve(pos,neg) # fait la roc
+X <- rc1$XY[1,]
+Y <- rc1$XY[2,]
+rc2 = ROCcurve(pos_pen,neg_pen) # fait la roc
+X_pen <- rc2$XY[1,]
+Y_pen <- rc2$XY[2,]
+rc3 = ROCcurve(pos_pen2,neg_pen2) # fait la roc
+X_pen2 <- rc3$XY[1,]
+Y_pen2 <- rc3$XY[2,]
+rc4 = ROCcurve(pos_pen3,neg_pen3) # fait la roc
+X_pen3 <- rc4$XY[1,]
+Y_pen3 <- rc4$XY[2,]
+#
+AU <- rc1$AUC
+A <- as.character(round(AU,4))
+AUC <- paste("AUC = ", A,sep="")
+#
+AU_pen<- rc2$AUC
+A_pen<- as.character(round(AU_pen,4))
+AUC_pen<- paste("AUC with penalties = ", A_pen,sep="")
+#
+AU_pen2<- rc3$AUC
+A_pen2<- as.character(round(AU_pen2,4))
+AUC_pen2<- paste("AUC with penalties and density = ", A_pen2,sep="")
+#
+AU_pen3<- rc4$AUC
+A_pen3<- as.character(round(AU_pen3,4))
+AUC_pen3<- paste("AUC with penalties, density and corelation = ", A_pen3,sep="")
+#
+{plot(X,Y,type="l",col="red",lwd=2,
+      ylab="ARF2",xlab="ARF5",
+      main="ARF2 vs ARF5")}
+lines(X_pen,Y_pen,col='cornflowerblue',lwd=2)
+lines(X_pen2,Y_pen2,col='green4',lwd=2)
+#lines(X_pen3,Y_pen3,col='orange',lwd=2)
+{legend(0.3,0.15,legend=c(AUC,AUC_pen,AUC_pen2),#AUC_pen3),
+        col=c("red","cornflowerblue","green4","orange"),lty=rep(1,4),lwd=rep(2,4))}
+
+dev.copy(device = png, filename = 'ROC_ARF2_vs_ARF5_test.png', width = 800, height = 600) 
+dev.off()
+
+#ajout de la densité
+
+## pn01 <- c(rep(0,length(ARF2_pos)),rep(1,length(ARF2_neg)))
+    
+## lm1 <- glm(pn01~rbind(scores_ER_pos,scores_ER_neg),family=binomial)   # variable 1
+
+## an1 <- anova(lm1,test="Chisq")

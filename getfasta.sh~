@@ -1,0 +1,14 @@
+#!/bin/bash
+
+bedtools getfasta -fi ~/Data/tair10/tair10.fas -bed ARF2_1000_1_neg.bed ARF2_1000_1_neg.fas
+bedtools getfasta -fi ~/Data/tair10/tair10.fas -bed ARF2_1000_2_neg.bed ARF2_1000_2_neg.fas
+bedtools getfasta -fi ~/Data/tair10/tair10.fas -bed ARF2_1000_3_neg.bed ARF2_1000_3_neg.fas
+bedtools getfasta -fi ~/Data/tair10/tair10.fas -bed ARF2_1000_4_neg.bed ARF2_1000_4_neg.fas
+bedtools getfasta -fi ~/Data/tair10/tair10.fas -bed ARF2_1000_pos.bed ARF2_1000_pos.fas
+bedtools getfasta -fi ~/Data/tair10/tair10.fas -bed MP_1000_1_neg.bed MP_1000_1_neg.fas
+bedtools getfasta -fi ~/Data/tair10/tair10.fas -bed MP_1000_2_neg.bed MP_1000_2_neg.fas
+bedtools getfasta -fi ~/Data/tair10/tair10.fas -bed MP_1000_3_neg.bed MP_1000_3_neg.fas
+bedtools getfasta -fi ~/Data/tair10/tair10.fas -bed MP_1000_4_neg.bed MP_1000_4_neg.fas
+bedtools getfasta -fi ~/Data/tair10/tair10.fas -bed MP_1000_pos.bed MP_1000_pos.fas
+
+exit 0
